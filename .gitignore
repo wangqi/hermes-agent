@@ -47,4 +47,16 @@ cli-config.yaml
 
 # Skills Hub state (lives in ~/.hermes/skills/.hub/ at runtime, but just in case)
 skills/.hub/
+
+# Credential and config files that may appear inside skill directories
+# Skills must never contain real API keys — use env vars or ~/.config/ instead
+skills/**/.env
+skills/**/*.env
+skills/**/config.json
+skills/**/credentials.json
+skills/**/secrets.json
+skills/**/*.p8
+skills/**/*.pem
+skills/**/*.key
+skills/**/*.ppk
 ignored/
