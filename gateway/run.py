@@ -1325,13 +1325,16 @@ class GatewayRunner:
                 "schedule_cronjob": "⏰",
                 "list_cronjobs": "⏰",
                 "remove_cronjob": "⏰",
+                "execute_code": "🐍",
+                "delegate_task": "🔀",
             }
             emoji = tool_emojis.get(tool_name, "⚙️")
             
             if preview:
                 # Truncate preview to keep messages clean
-                if len(preview) > 40:
-                    preview = preview[:37] + "..."
+                limit = 80 if tool_name == "execute_code" else 40
+                if len(preview) > limit:
+                    preview = preview[:limit - 3] + "..."
                 msg = f"{emoji} {tool_name}... \"{preview}\""
             else:
                 msg = f"{emoji} {tool_name}..."

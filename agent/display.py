@@ -95,6 +95,15 @@ def build_tool_preview(tool_name: str, args: dict, max_len: int = 40) -> str:
         }
         return rl_previews.get(tool_name)
 
+    if tool_name == "execute_code":
+        code = args.get("code", "").strip()
+        # Find the first non-empty, non-comment line to use as preview
+        for line in code.splitlines():
+            line = line.strip()
+            if line and not line.startswith("#"):
+                return line
+        return code.splitlines()[0].strip() if code else None
+
     key = primary_args.get(tool_name)
     if not key:
         for fallback_key in ("query", "text", "command", "path", "name", "prompt"):
