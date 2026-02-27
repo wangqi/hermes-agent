@@ -5,6 +5,10 @@ Transcription Tools Module
 Provides speech-to-text transcription using multiple providers:
 - Groq (free, fast) - whisper-large-v3-turbo
 - OpenAI - whisper-1, gpt-4o-mini-transcribe, gpt-4o-transcribe
+- speaches (local) - Systran/faster-whisper-large-v3
+  Runs a local OpenAI-compatible server: https://github.com/speaches-ai/speaches
+  Default endpoint: http://localhost:8000/v1
+  Override with stt.base_url in ~/.hermes/config.yaml
 
 Used by the messaging gateway to automatically transcribe voice messages
 sent by users on Telegram, Discord, WhatsApp, and Slack.
@@ -31,12 +35,14 @@ logger = logging.getLogger(__name__)
 DEFAULT_MODELS = {
     "groq": "whisper-large-v3-turbo",
     "openai": "whisper-1",
+    "speaches": "Systran/faster-whisper-large-v3",
 }
 
 # API base URLs per provider
 API_BASE_URLS = {
     "groq": "https://api.groq.com/openai/v1",
     "openai": "https://api.openai.com/v1",
+    "speaches": "http://localhost:8000/v1",
 }
 
 
@@ -79,6 +85,9 @@ def _get_api_key(provider: str) -> Optional[str]:
         return key
     elif provider == "openai":
         return os.getenv("VOICE_TOOLS_OPENAI_KEY") or os.getenv("OPENAI_API_KEY")
+    elif provider == "speaches":
+        # speaches doesn't require an API key, but the OpenAI SDK requires a non-empty value
+        return "local"
     return None
 
 
@@ -125,7 +134,7 @@ def transcribe_audio(file_path: str, model: Optional[str] = None, provider: Opti
     if model is None:
         model = stt_config.get("model") or DEFAULT_MODELS.get(provider, "whisper-1")
 
-    base_url = API_BASE_URLS.get(provider, "https://api.openai.com/v1")
+    base_url = stt_config.get("base_url") or API_BASE_URLS.get(provider, "https://api.openai.com/v1")
 
     try:
         from openai import OpenAI

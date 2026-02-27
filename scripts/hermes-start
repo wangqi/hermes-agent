@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# hermes-start — Start speaches STT service then launch Hermes
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+
+SPEACHES_CONTAINER="speaches"
+SPEACHES_IMAGE="ghcr.io/speaches-ai/speaches:latest-cpu"
+SPEACHES_PORT="8000"
+SPEACHES_HEALTH_URL="http://localhost:${SPEACHES_PORT}/health"
+SPEACHES_HEALTH_TIMEOUT=30  # seconds to wait for speaches to become ready
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+log()  { echo "[hermes-start] $*"; }
+warn() { echo "[hermes-start] WARNING: $*" >&2; }
+
+start_speaches() {
+    log "Starting speaches container..."
+    docker run --rm --detach \
+        --publish "${SPEACHES_PORT}:8000" \
+        --name "${SPEACHES_CONTAINER}" \
+        --volume hf-hub-cache:/home/ubuntu/.cache/huggingface/hub \
+        "${SPEACHES_IMAGE}" >/dev/null
+    log "Speaches container started."
+}
+
+wait_for_speaches() {
+    log "Waiting for speaches to be ready (timeout: ${SPEACHES_HEALTH_TIMEOUT}s)..."
+    local elapsed=0
+    until curl -sf "${SPEACHES_HEALTH_URL}" >/dev/null 2>&1; do
+        if (( elapsed >= SPEACHES_HEALTH_TIMEOUT )); then
+            warn "Speaches did not become ready in time — continuing anyway."
+            return
+        fi
+        sleep 1
+        (( elapsed++ ))
+    done
+    log "Speaches is ready."
+}
+
+# ---------------------------------------------------------------------------
+# Speaches lifecycle
+# ---------------------------------------------------------------------------
+
+if ! command -v docker &>/dev/null; then
+    warn "Docker not found — skipping speaches startup. STT will be unavailable."
+elif docker inspect --format '{{.State.Running}}' "${SPEACHES_CONTAINER}" 2>/dev/null | grep -q true; then
+    log "Speaches container is already running."
+else
+    # Remove any stopped container with the same name before starting fresh
+    docker rm -f "${SPEACHES_CONTAINER}" 2>/dev/null || true
+    start_speaches
+    wait_for_speaches
+fi
+
+# ---------------------------------------------------------------------------
+# Stop any existing Hermes process
+# ---------------------------------------------------------------------------
+
+EXISTING_PIDS=$(pgrep -f "${PROJECT_DIR}/cli.py" 2>/dev/null || true)
+if [[ -n "$EXISTING_PIDS" ]]; then
+    log "Stopping existing Hermes process(es): $EXISTING_PIDS"
+    kill $EXISTING_PIDS 2>/dev/null || true
+    # Wait up to 5s for clean exit, then force-kill
+    deadline=$(( $(date +%s) + 5 ))
+    while kill -0 $EXISTING_PIDS 2>/dev/null; do
+        if (( $(date +%s) >= deadline )); then
+            kill -9 $EXISTING_PIDS 2>/dev/null || true
+            break
+        fi
+        sleep 0.5
+    done
+    log "Existing Hermes stopped."
+fi
+
+# ---------------------------------------------------------------------------
+# Launch Hermes
+# ---------------------------------------------------------------------------
+
+log "Starting Hermes..."
+cd "${PROJECT_DIR}"
+exec uv run python cli.py "$@"
