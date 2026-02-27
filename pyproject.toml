@@ -35,6 +35,7 @@ dependencies = [
   "platformdirs",
   # Skills Hub (GitHub App JWT auth — optional, only needed for bot identity)
   "PyJWT[crypto]",
+  "python-telegram-bot>=22.6",
 ]
 
 [project.optional-dependencies]
