@@ -50,12 +50,14 @@ Changes:
 
 ---
 
-## 4. STT — speaches (local, OpenAI-compatible)
+## 4. Voice — STT + TTS via speaches and Edge TTS
+
+### 4a. STT — speaches (local, OpenAI-compatible)
 
 **Commits:**
 - `2e0aa38` — `feat(stt): add Groq provider support for voice transcription` (refactored the
   whole STT module into a multi-provider abstraction; Groq was the first new provider)
-- Current (unstaged) — switched default provider to speaches
+- `6b0e2f2` — `feat(stt): switch to speaches local STT provider`
 
 **File:** `tools/transcription_tools.py`
 
@@ -90,6 +92,38 @@ docker run --rm --detach \
 
 The `Systran/faster-whisper-large-v3` model is downloaded once and cached in the
 `hf-hub-cache` Docker volume (persists across container restarts).
+
+### 4b. TTS — Edge TTS (auto-reply with voice)
+
+**Commits:**
+- `5a9ed3a` — `fix(gateway): instruct agent to reply with TTS when user sends a voice message`
+- `d593b93` — `fix(gateway): only scan new-turn messages for MEDIA tags, not full history`
+
+**File:** `gateway/run.py`, `tools/tts_tool.py`
+
+**Active config (`~/.hermes/config.yaml`):**
+```yaml
+tts:
+  provider: edge
+  edge:
+    voice: en-US-AvaMultilingualNeural
+```
+
+Edge TTS is free, requires no API key, and outputs MP3 converted to OGG Opus via ffmpeg
+for Telegram voice bubbles.
+
+**Two bugs fixed to make voice replies work end-to-end:**
+
+1. **No TTS trigger** (`gateway/run.py:1113`): When the user sends a voice message, the
+   transcription context string now includes an explicit instruction:
+   `— Please reply using the text_to_speech tool so your response is also a voice message.`
+   Without this, the LLM replied in text even though the user spoke.
+
+2. **Duplicate voice files sent** (`gateway/run.py`): The MEDIA tag scanner was iterating
+   over `result["messages"]` which includes the full conversation history. This caused all
+   TTS `.ogg` files from previous turns to be re-sent on every reply. Fixed by recording
+   `history_offset = len(agent_history)` before the agent run and slicing
+   `result["messages"][history_offset:]` to only scan the current turn's tool results.
 
 ---
 
@@ -143,11 +177,13 @@ Uses account name `customercare` with correct himalaya flag syntax (`-a` on subc
 
 ## 6. Startup Script (`scripts/hermes-start`)
 
-**Status:** Untracked (not yet committed)
+**Commits:**
+- `6b0e2f2` — initial script
+- `ba14420` — `feat(scripts): add launchd service management to hermes-start`
 
 A bash script that replaces `uv run python cli.py` as the standard way to start Hermes.
 
-**What it does:**
+**What it does (run mode):**
 1. Checks if Docker is available
 2. Starts the speaches Docker container if not already running, waits up to 30s for health
 3. Stops any existing Hermes process (SIGTERM → 5s grace → SIGKILL) to prevent duplicates
@@ -158,3 +194,13 @@ A bash script that replaces `uv run python cli.py` as the standard way to start 
 ./scripts/hermes-start            # interactive mode
 ./scripts/hermes-start --gateway  # gateway mode
 ```
+
+**Service management (macOS launchd):**
+```bash
+./scripts/hermes-start install    # install as login service (auto-starts on login, restarts on crash)
+./scripts/hermes-start uninstall  # remove the service
+./scripts/hermes-start status     # show launchctl status + recent logs
+```
+
+Installed plist: `~/Library/LaunchAgents/ai.hermes.start.plist`
+Logs: `~/.hermes/logs/gateway.log` and `gateway.error.log`
