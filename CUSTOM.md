@@ -83,7 +83,8 @@ stt:
 
 **Running speaches:**
 ```bash
-docker run --rm --detach \
+docker run --detach \
+  --restart unless-stopped \
   --publish 8000:8000 \
   --name speaches \
   --volume hf-hub-cache:/home/ubuntu/.cache/huggingface/hub \

@@ -30,7 +30,8 @@ warn() { echo "[hermes-start] WARNING: $*" >&2; }
 
 start_speaches() {
     log "Starting speaches container..."
-    docker run --rm --detach \
+    docker run --detach \
+        --restart unless-stopped \
         --publish "${SPEACHES_PORT}:8000" \
         --name "${SPEACHES_CONTAINER}" \
         --volume hf-hub-cache:/home/ubuntu/.cache/huggingface/hub \
