@@ -108,11 +108,11 @@ def transcribe_audio(file_path: str, model: Optional[str] = None, provider: Opti
     """
     # Load config
     stt_config = _load_stt_config()
-    
+
     # Determine provider (config > parameter > default)
     if provider is None:
         provider = stt_config.get("provider", "groq")
-    
+
     # Get API key
     api_key = _get_api_key(provider)
     if not api_key:
