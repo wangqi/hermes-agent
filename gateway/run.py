@@ -1111,7 +1111,8 @@ class GatewayRunner:
                     transcript = result["transcript"]
                     enriched_parts.append(
                         f'[The user sent a voice message~ '
-                        f'Here\'s what they said: "{transcript}"]'
+                        f'Here\'s what they said: "{transcript}" '
+                        f'— Please reply using the text_to_speech tool so your response is also a voice message.]'
                     )
                 else:
                     error = result.get("error", "unknown error")
