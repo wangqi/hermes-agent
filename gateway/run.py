@@ -1497,9 +1497,10 @@ class GatewayRunner:
                             content = f"[Delivered from {mirror_src}] {content}"
                         agent_history.append({"role": role, "content": content})
             
+            history_offset = len(agent_history)
             result = agent.run_conversation(message, conversation_history=agent_history)
             result_holder[0] = result
-            
+
             # Return final response, or a message if something went wrong
             final_response = result.get("final_response")
             if not final_response:
@@ -1510,17 +1511,20 @@ class GatewayRunner:
                     "api_calls": result.get("api_calls", 0),
                     "tools": tools_holder[0] or [],
                 }
-            
+
             # Scan tool results for MEDIA:<path> tags that need to be delivered
             # as native audio/file attachments.  The TTS tool embeds MEDIA: tags
             # in its JSON response, but the model's final text reply usually
             # doesn't include them.  We collect unique tags from tool results and
             # append any that aren't already present in the final response, so the
             # adapter's extract_media() can find and deliver the files exactly once.
+            # Only scan NEW messages from this turn (skip history) to avoid
+            # re-sending MEDIA files from previous turns.
             if "MEDIA:" not in final_response:
                 media_tags = []
                 has_voice_directive = False
-                for msg in result.get("messages", []):
+                new_messages = result.get("messages", [])[history_offset:]
+                for msg in new_messages:
                     if msg.get("role") == "tool" or msg.get("role") == "function":
                         content = msg.get("content", "")
                         if "MEDIA:" in content:
